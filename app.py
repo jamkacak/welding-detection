@@ -109,7 +109,7 @@ def main():
         st.session_state["messages"] = []
     
     with st.sidebar:
-        st.image('welder-happy.gif')
+        # st.image('welder-happy.gif')
         if st.button('🔄 Restart'):
             clear_chat()
         uploaded_file = st.file_uploader("Upload an image", type=["jpg", "jpeg", "png"], key=f"uploaded_file_{st.session_state['uploaded_file_key']}")
