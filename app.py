@@ -10,7 +10,7 @@ from ultralytics import YOLO
 from PIL import Image
 
 # Constants
-BASE_API_URL = "http://127.0.0.1:7860"
+BASE_API_URL = "https://fond-jaybird-touching.ngrok-free.app"
 FLOW_ID = "bf94ab78-019e-4853-879a-a1f6db2cfb7e"
 ENDPOINT = "" # You can set a specific endpoint name in the flow settings
 
