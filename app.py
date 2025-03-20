@@ -77,12 +77,14 @@ def extract_message(response: dict) -> str:
         return "No valid message found in response."
 
 def clear_chat():
-    st.session_state["analysis_done"] = False
-    TWEAKS = {"Memory-90Pf3": {}, "ChatInput-vG3C5": {}}
-    st.session_state["messages"] = []
+    st.session_state["analysis_done"] = False  # Reset analysis status
+    TWEAKS = {"Memory-90Pf3": {}, "ChatInput-vG3C5": {}}  # Clear tweaks state
+    st.session_state["messages"] = []  # Clear message history
     st.session_state["uploaded_file_key"] += 1  # Increment key to force file uploader reset
     st.session_state["detected_objects"] = ""  # Reset detected objects
-    st.rerun()
+    st.session_state["uploaded_image"] = None  # Clear uploaded image state
+    st.session_state["camera_image"] = None  # Clear camera image state
+    st.rerun()  # Refresh the app to reflect changes
 
 def display_bounding_boxes(image, results):
     """Draws bounding boxes and labels on an image."""
@@ -148,13 +150,14 @@ def main():
             clear_chat()
         uploaded_file = st.file_uploader("Upload an image", type=["jpg", "jpeg", "png"], key=f"uploaded_file_{st.session_state['uploaded_file_key']}")
         enable = st.checkbox("Enable camera")
-        uploaded_file = st.camera_input("Take a picture", disabled=not enable)
-    
+        camera = st.camera_input("Take a picture", disabled=not enable)
+
     col1, col2 = st.columns(2)
 
     if "analysis_done" not in st.session_state:
         st.session_state["analysis_done"] = False  # Track if analysis has been done
 
+    # Handle uploaded image
     if uploaded_file and not st.session_state["analysis_done"]:
         image = Image.open(uploaded_file)
         col1.image(image, caption="Uploaded Image", use_container_width=True)
@@ -164,10 +167,8 @@ def main():
             results = model(image, conf=0.5, iou=0.6)
             processed_image = display_bounding_boxes(image, results)
             TWEAKS["TextInput-egPWI"]["input_value"] = results[0].to_json()
-            # st.write(results[0].to_json())
             response = extract_message(run_flow('what can you see', tweaks=TWEAKS))
             
-            # Ensure it only gets appended once
             if not st.session_state["analysis_done"]:
                 st.session_state["messages"].append({"role": "assistant", "content": response, "avatar": "🤖"})
                 st.session_state["analysis_done"] = True  # Mark as done
@@ -177,6 +178,29 @@ def main():
         detected_classes = [result.names[int(box.cls[0])] for result in results for box in result.boxes]
         st.session_state["detected_objects"] = ", ".join(set(detected_classes))
         st.success(f"Objects detected: {st.session_state['detected_objects']}")
+
+    # Handle camera input
+    if camera and not st.session_state["analysis_done"]:
+        image = Image.open(camera)
+        col1.image(image, caption="Captured Image", use_container_width=True)
+        model = YOLO('best.pt')
+
+        with st.spinner("Analyzing image..."):
+            results = model(image, conf=0.5, iou=0.6)
+            processed_image = display_bounding_boxes(image, results)
+            TWEAKS["TextInput-egPWI"]["input_value"] = results[0].to_json()
+            response = extract_message(run_flow('what can you see', tweaks=TWEAKS))
+            
+            if not st.session_state["analysis_done"]:
+                st.session_state["messages"].append({"role": "assistant", "content": response, "avatar": "🤖"})
+                st.session_state["analysis_done"] = True  # Mark as done
+
+        col2.image(processed_image, caption="Detected Objects", use_container_width=True)
+
+        detected_classes = [result.names[int(box.cls[0])] for result in results for box in result.boxes]
+        st.session_state["detected_objects"] = ", ".join(set(detected_classes))
+        st.success(f"Objects detected: {st.session_state['detected_objects']}")
+
     
     # Chat Section
     for msg in st.session_state["messages"]:
