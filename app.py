@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 from typing import Optional
 from ultralytics import YOLO
 from PIL import Image
+import base64
 
 # Constants
 BASE_API_URL = "https://fond-jaybird-touching.ngrok-free.app"
@@ -76,8 +77,8 @@ def extract_message(response: dict) -> str:
         return "No valid message found in response."
 
 def clear_chat():
-    """Clears chat history, resets uploaded file, and clears Langflow session."""
-    TWEAKS = {"Memory-90Pf3": {}}
+    st.session_state["analysis_done"] = False
+    TWEAKS = {"Memory-90Pf3": {}, "ChatInput-vG3C5": {}}
     st.session_state["messages"] = []
     st.session_state["uploaded_file_key"] += 1  # Increment key to force file uploader reset
     st.session_state["detected_objects"] = ""  # Reset detected objects
@@ -97,11 +98,45 @@ def display_bounding_boxes(image, results):
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
     return image_np
 
+def set_bg(image_file):
+    with open(image_file, "rb") as f:
+        encoded_string = base64.b64encode(f.read()).decode()
+    
+    bg_css = f"""
+    <style>
+    .stApp {{
+        background-image: url("data:image/png;base64,{encoded_string}");
+        background-size: cover;
+        background-position: center;
+        background-attachment: fixed;
+    }}
+    </style>
+    """
+    st.markdown(bg_css, unsafe_allow_html=True)
+
+def set_gradient_bg():
+    bg_css = """
+    <style>
+    body, html, .stApp {
+        height: 100%;
+        width: 100%;
+        margin: 0;
+        padding: 0;
+        overflow: hidden;
+        background: linear-gradient(135deg, #d3d3d3, #f0f0f0);
+        background-size: cover;
+        background-position: center;
+        background-attachment: fixed;
+    }
+    </style>
+    """
+    st.markdown(bg_css, unsafe_allow_html=True)
+
 def main():
     st.set_page_config(page_title="Welding Defect Detector", layout="wide")
     st.title("🔎 AI-Powered Welding Inspection")
     st.write("Upload an image of a weld, and let the AI analyze defects and answer your questions!")
-
+    set_gradient_bg()
     
     if "uploaded_file_key" not in st.session_state:
         st.session_state["uploaded_file_key"] = 0  # Initialize uploaded file key
@@ -109,25 +144,34 @@ def main():
         st.session_state["messages"] = []
     
     with st.sidebar:
-        # st.image('welder-happy.gif')
         if st.button('🔄 Restart'):
             clear_chat()
         uploaded_file = st.file_uploader("Upload an image", type=["jpg", "jpeg", "png"], key=f"uploaded_file_{st.session_state['uploaded_file_key']}")
     
     col1, col2 = st.columns(2)
-    if uploaded_file:
+
+    if "analysis_done" not in st.session_state:
+        st.session_state["analysis_done"] = False  # Track if analysis has been done
+
+    if uploaded_file and not st.session_state["analysis_done"]:
         image = Image.open(uploaded_file)
         col1.image(image, caption="Uploaded Image", use_container_width=True)
         model = YOLO('best.pt')
-        
+
         with st.spinner("Analyzing image..."):
             results = model(image, conf=0.5, iou=0.6)
             processed_image = display_bounding_boxes(image, results)
             TWEAKS["TextInput-egPWI"]["input_value"] = results[0].to_json()
-            # st.text(results[0].to_json())
-        
+            # st.write(results[0].to_json())
+            response = extract_message(run_flow('what can you see', tweaks=TWEAKS))
+            
+            # Ensure it only gets appended once
+            if not st.session_state["analysis_done"]:
+                st.session_state["messages"].append({"role": "assistant", "content": response, "avatar": "🤖"})
+                st.session_state["analysis_done"] = True  # Mark as done
+
         col2.image(processed_image, caption="Detected Objects", use_container_width=True)
-        
+
         detected_classes = [result.names[int(box.cls[0])] for result in results for box in result.boxes]
         st.session_state["detected_objects"] = ", ".join(set(detected_classes))
         st.success(f"Objects detected: {st.session_state['detected_objects']}")
