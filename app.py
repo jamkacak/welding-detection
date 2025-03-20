@@ -118,7 +118,7 @@ def main():
     if uploaded_file:
         image = Image.open(uploaded_file)
         col1.image(image, caption="Uploaded Image", use_container_width=True)
-        model = YOLO(r'C:\Users\suhaimi\Desktop\Nidzam\capstone\runs\detect\train6\weights\best.pt')
+        model = YOLO('best.pt')
         
         with st.spinner("Analyzing image..."):
             results = model(image, conf=0.5, iou=0.6)
