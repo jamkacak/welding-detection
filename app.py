@@ -147,6 +147,8 @@ def main():
         if st.button('🔄 Restart'):
             clear_chat()
         uploaded_file = st.file_uploader("Upload an image", type=["jpg", "jpeg", "png"], key=f"uploaded_file_{st.session_state['uploaded_file_key']}")
+        enable = st.checkbox("Enable camera")
+        uploaded_file = st.camera_input("Take a picture", disabled=not enable)
     
     col1, col2 = st.columns(2)
 
